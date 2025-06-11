@@ -1,0 +1,120 @@
+✅ 1. CheckDeploymentIfFailed Function
+
+Function CheckDeploymentIfFailed {
+    param (
+        [string]$deploymentId,
+        [string]$sdiBaseUrl,
+        [string]$httpContentType,
+        [hashtable]$headers,
+        [bool]$debugOutput = $false,
+        [bool]$infoOutput = $false
+    )
+
+    if ($null -eq $deploymentId) {
+        throw "Deployment ID is required"
+    }
+
+    $url = "$sdiBaseUrl/deployment/api/deployments/$deploymentId?expand=lastRequest"
+    Write-Host "Checking status for deployment ID: $deploymentId with URI: $url"
+
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
+        $status = $response.status
+        $lastRequestStatus = $response.lastRequest.status
+
+        Write-Host "Deployment Status: $status | Last Request Status: $lastRequestStatus"
+
+        if ($lastRequestStatus -eq "CREATE_FAILED") {
+            return @{
+                isFailed = $true
+                deploymentId = $deploymentId
+                status = $status
+                lastRequestStatus = $lastRequestStatus
+            }
+        } else {
+            return @{
+                isFailed = $false
+                deploymentId = $deploymentId
+                status = $status
+                lastRequestStatus = $lastRequestStatus
+            }
+        }
+    }
+    catch {
+        throw "Error retrieving deployment status: $_"
+    }
+}
+
+
+
+
+
+
+
+
+✅ 2. DeleteDeployment Function
+
+
+Function DeleteDeployment {
+    param (
+        [string]$deploymentId,
+        [string]$sdiBaseUrl,
+        [hashtable]$headers,
+        [bool]$debugOutput = $false,
+        [bool]$infoOutput = $false
+    )
+
+    if ($null -eq $deploymentId) {
+        throw "Deployment ID is required for deletion"
+    }
+
+    $url = "$sdiBaseUrl/deployment/api/deployments/$deploymentId"
+    Write-Host "Attempting to delete deployment with ID: $deploymentId at URL: $url"
+
+    try {
+        Invoke-RestMethod -Uri $url -Method Delete -Headers $headers
+        Write-Host "Deployment $deploymentId deleted successfully."
+    }
+    catch {
+        throw "Error deleting deployment $deploymentId: $_"
+    }
+}
+
+
+
+
+
+
+
+✅ 3. Main Script Logic
+
+
+# Input Variables (update accordingly)
+$deploymentId = "<your-deployment-id>"
+$sdiBaseUrl = "<your-base-url>"               # e.g., https://portal.sdi.com
+$httpContentType = "application/json"
+$headers = @{
+    Authorization = "Bearer <your-token>"
+    "Content-Type" = $httpContentType
+}
+$skipDelete = $false  # Set this to $true if you want to skip deletion even if failed
+
+# Check if failed
+$result = CheckDeploymentIfFailed -deploymentId $deploymentId -sdiBaseUrl $sdiBaseUrl -httpContentType $httpContentType -headers $headers
+
+if ($result.isFailed) {
+    if (-not $skipDelete) {
+        Write-Host "Deployment $($result.deploymentId) failed. Proceeding to delete..."
+        DeleteDeployment -deploymentId $result.deploymentId -sdiBaseUrl $sdiBaseUrl -headers $headers
+    } else {
+        Write-Host "Deployment $($result.deploymentId) failed, but deletion is skipped due to parameter."
+    }
+} else {
+    Write-Host "Deployment $($result.deploymentId) is not failed. No action taken."
+}
+
+
+
+
+
+
