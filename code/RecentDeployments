@@ -1,0 +1,63 @@
+param (
+    [string]$sdiBaseUrl = "https://xxxx.com",
+    [string]$httpContentType = "application/json",
+    [hashtable]$headers,
+    [int]$deploymentCount = 5,
+    [bool]$debugOutput = $false
+)
+
+function Get-RecentDeployments {
+    param (
+        [string]$sdiBaseUrl,
+        [hashtable]$headers,
+        [int]$deploymentCount
+    )
+
+    $url = "$sdiBaseUrl/deployment/api/deployments?expand=lastRequest&limit=$deploymentCount"
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
+        return $response
+    } catch {
+        Write-Error "Failed to fetch deployments: $_"
+        return @()
+    }
+}
+
+function Print-DeploymentStatus {
+    param (
+        $deployments
+    )
+
+    foreach ($deployment in $deployments) {
+        $id = $deployment.id
+        $status = $deployment.status
+        $lastRequestStatus = $deployment.lastRequest.status
+        Write-Host "Deployment ID: $id | Status: $status | Last Request Status: $lastRequestStatus"
+    }
+}
+
+# ========= Execution ===========
+$deployments = Get-RecentDeployments -sdiBaseUrl $sdiBaseUrl -headers $headers -deploymentCount $deploymentCount
+
+if ($deployments -and $deployments.Count -gt 0) {
+    Print-DeploymentStatus -deployments $deployments
+} else {
+    Write-Host "No deployments found."
+}
+
+
+
+
+
+
+
+
+
+
+
+
+$headers = @{
+    Authorization = "Bearer <your-token>"
+    "Content-Type" = "application/json"
+}
+.\CheckExistingDeployments.ps1 -headers $headers
