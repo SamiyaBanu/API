@@ -1,0 +1,29 @@
+# Import the function
+. .\CheckDeploymentStatus.ps1
+
+# Define parameters
+$sdiBaseUrl = "<your-sdi-base-url>"   # e.g., https://portal.sdi.com
+$httpContentType = "application/json"
+$headers = @{
+    Authorization = "Bearer <your-token>"
+    "Content-Type" = $httpContentType
+}
+
+# Step 1: Get list of deployments
+$deploymentsUrl = "$sdiBaseUrl/deployment/api/deployments?expand=lastRequest"
+$response = Invoke-RestMethod -Uri $deploymentsUrl -Method Get -Headers $headers
+
+# Step 2: Get the latest deployment
+$latestDeployment = $response.content | Sort-Object -Property "creationTime" -Descending | Select-Object -First 1
+$deploymentId = $latestDeployment.id
+
+Write-Host "Latest Deployment ID: $deploymentId"
+
+# Step 3: Use helper to check if it's CREATE_FAILED
+$result = CheckDeploymentIfFailed -deploymentId $deploymentId -sdiBaseUrl $sdiBaseUrl -httpContentType $httpContentType -headers $headers
+
+# Step 4: Print result
+Write-Host "Deployment ID: $($result.deploymentId)"
+Write-Host "Status: $($result.status)"
+Write-Host "Last Request Status: $($result.lastRequestStatus)"
+Write-Host "Is Failed: $($result.isFailed)"
