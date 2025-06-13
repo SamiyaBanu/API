@@ -1,0 +1,19 @@
+function Get-FirstFiveDeploymentIds {
+    param (
+        [string]$sdiBaseUrl,
+        [hashtable]$headers
+    )
+
+    $url = "$sdiBaseUrl/deployment/api/deployments"
+
+    try {
+        $response = Invoke-RestMethod -Uri $url -Method Get -Headers $headers
+
+        # Only take the first 5 deployments
+        $deploymentIds = $response | Select-Object -First 5 -ExpandProperty id
+
+        return $deploymentIds
+    } catch {
+        throw "Error fetching deployment list: $_"
+    }
+}
