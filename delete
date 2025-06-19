@@ -1,20 +1,46 @@
-# Assuming $configurationItem holds the CI ID or Name
-$ciResourcesUrl = "$sdiBaseUrl/deployment/api/deployments/$configurationItem/resources?resourceTypes=Cloud.vSphere.Machine"
+# You already have this variable
+$configurationItemId = "<your-configuration-item-id>"
 
-Write-Output "Getting all VMs under CI: $configurationItem"
-$ciResources = ExecuteSDICall -sdiUsername $sdiUsername -sdiPassword $sdiPassword -secureSdiPassword $secureSdiPassword -sdiUrl $ciResourcesUrl
+# Step 1: Construct the URL to get all vSphere VMs inside this CI
+$vmResourcesUrl = "$sdiBaseUrl/deployment/api/deployments/$configurationItemId/resources?resourceTypes=Cloud.vSphere.Machine"
 
-foreach ($vm in $ciResources.content) {
-    $vmStatus = $vm.status
-    $vmId = $vm.id
-    $vmName = $vm.name
+Write-Host "Getting VMs from Configuration Item ID: $configurationItemId"
 
-    Write-Output "VM: $vmName, Status: $vmStatus"
+try {
+    $vmResources = ExecuteSDICall -sdiUsername $sdiUsername `
+                                  -sdiPassword $sdiPassword `
+                                  -secureSdiPassword $secureSdiPassword `
+                                  -sdiUrl $vmResourcesUrl
 
-    if ($vmStatus -eq "CREATE_FAILED" -and -not $SkipFailedDeploymentDeletion) {
-        Write-Output "Deleting failed VM deployment: $vmName ($vmId)"
-        $deleteResponse = DeleteDeploymentById -sdiUsername $sdiUsername -sdiPassword $sdiPassword -secureSdiPassword $secureSdiPassword -deploymentId $vmId -debugOutput $debugOutput -infoOutput $infoOutput
-    } elseif ($vmStatus -eq "CREATE_FAILED" -and $SkipFailedDeploymentDeletion) {
-        Write-Output "Skipping deletion of failed VM as per switch: $vmName"
+    $hasFailedVM = $false
+
+    # Step 2: Loop through each VM inside CI
+    foreach ($vm in $vmResources.content) {
+        $vmName = $vm.name
+        $vmStatus = $vm.status
+
+        Write-Output "VM Name: $vmName | Status: $vmStatus"
+
+        if ($vmStatus -eq "CREATE_FAILED") {
+            $hasFailedVM = $true
+        }
     }
+
+    # Step 3: Delete the CI only if any VM failed
+    if ($hasFailedVM) {
+        Write-Host "One or more VMs in this CI are in CREATE_FAILED status. Deleting CI $configurationItemId..."
+
+        DeleteDeploymentById `
+            -sdiUsername $sdiUsername `
+            -sdiPassword $sdiPassword `
+            -secureSdiPassword $secureSdiPassword `
+            -deploymentId $configurationItemId `
+            -debugOutput $debugOutput `
+            -infoOutput $infoOutput
+    } else {
+        Write-Host "✅ All VMs in this CI are healthy. No deletion needed."
+    }
+
+} catch {
+    Write-Error "❌ Failed to retrieve VM resources or delete deployment: $_"
 }
